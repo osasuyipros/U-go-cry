@@ -227,7 +227,7 @@
             font-weight: bold;
         }
 
-        /* --- Chat System --- */
+        /* --- Chat System & Lists --- */
         .chat-system, .spectator-box {
             background: var(--grid-bg);
             border: 1px solid var(--border-color);
@@ -275,6 +275,45 @@
             border-radius: 5px;
             background: var(--bg-color);
             color: var(--text-color);
+        }
+
+        /* --- New Profile Icon Style --- */
+        .user-icon {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        /* User Status Colors */
+        .user-icon.player {
+            background-color: var(--primary-color); /* Blue for active players */
+            box-shadow: 0 0 5px var(--primary-color);
+        }
+
+        .user-icon.spectator {
+            background-color: var(--secondary-color); /* Grey/Teal for spectators */
+        }
+
+        .user-icon.admin {
+            background-color: var(--admin-color); /* Gold for Admin */
+            box-shadow: 0 0 5px var(--admin-color);
+        }
+
+        /* Styling the lists for better alignment */
+        #spectator-list li, #admin-player-list li, #admin-spectator-list li {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 5px 0;
+        }
+
+        #spectator-list li span, #admin-player-list li span, #admin-spectator-list li span {
+            flex-grow: 1; /* Allows the name and icon to take up space */
+            display: flex;
+            align-items: center;
         }
 
         /* --- Utility and Component Styles (Buttons, Login, Notifications) --- */
@@ -601,7 +640,7 @@
     <audio id="draw-sound" src="draw.mp3" preload="auto"></audio>
     
     <script>
-        /* --- JavaScript Logic --- */
+        /* --- JavaScript Logic (Final) --- */
         document.addEventListener('DOMContentLoaded', () => {
             // --- 1. Global State Management (Mock Real-time) ---
             let gameState = {
@@ -693,6 +732,10 @@
                     gameState.scores = loadedState.scores || gameState.scores;
                     gameState.matchHistory = loadedState.matchHistory || gameState.matchHistory;
                     gameState.board = loadedState.board || gameState.board;
+                    // Load active players/spectators (Simulated state)
+                    gameState.players = loadedState.players || gameState.players;
+                    gameState.spectators = loadedState.spectators || gameState.spectators.filter(u => u !== persistedUser);
+                    gameState.isGameActive = loadedState.isGameActive || false;
                 }
 
                 // Apply theme immediately
@@ -713,6 +756,9 @@
                     scores: gameState.scores,
                     matchHistory: gameState.matchHistory,
                     board: gameState.board,
+                    players: gameState.players, // Persist players
+                    spectators: gameState.spectators, // Persist spectators
+                    isGameActive: gameState.isGameActive,
                 }));
                 if (gameState.user && elements.rememberMe.checked) {
                     localStorage.setItem('currentUser', gameState.user);
@@ -749,7 +795,7 @@
                         cellDiv.classList.add(cell.toLowerCase());
                         cellDiv.innerHTML = `<span>${cell}</span>`;
                     }
-                    if (gameState.userRole === 'player' && gameState.isGameActive) {
+                    if (gameState.isGameActive && gameState.userRole !== 'guest') {
                         cellDiv.dataset.index = index;
                         cellDiv.addEventListener('click', handleMove);
                     }
@@ -764,7 +810,7 @@
                 elements.playerOCard.classList.remove('active-turn');
 
                 if (gameState.isGameActive) {
-                    const playerMark = gameState.currentPlayer === 'X' ? 'Player X' : 'Player O';
+                    const playerMark = gameState.currentPlayer === 'X' ? gameState.players[0] || 'Player X' : gameState.players[1] || 'Player O';
                     elements.turnIndicator.textContent = `It's ${playerMark}'s turn!`;
                     
                     if (gameState.currentPlayer === 'X') {
@@ -799,22 +845,66 @@
                 elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
             }
 
+            // ** FINAL UPDATED FUNCTION: Includes user icons and Admin "Add" button **
             function renderSpectators() {
                 elements.spectatorList.innerHTML = '';
-                const combinedList = [...gameState.players, ...gameState.spectators].filter(u => u !== gameState.user);
                 
-                combinedList.forEach(user => {
+                // Combine players and spectators, filter out the current user, and get unique names
+                const combinedList = [...gameState.players, ...gameState.spectators].filter(u => u !== gameState.user);
+                const uniqueUsers = Array.from(new Set(combinedList));
+
+                uniqueUsers.forEach(user => {
                     const li = document.createElement('li');
-                    const status = gameState.players.includes(user) ? '🎮' : '👁️';
-                    li.innerHTML = `${status} ${user}`;
+                    
+                    const isPlayer = gameState.players.includes(user);
+                    const isSpectator = gameState.spectators.includes(user);
+                    const isAdmin = (user === ADMIN_USERNAME);
+
+                    let iconClass = 'spectator'; // Default
+
+                    if (isAdmin) {
+                        iconClass = 'admin';
+                    } else if (isPlayer) {
+                        iconClass = 'player';
+                    }
+                    
+                    // Create the user display with the new icon
+                    const userSpan = document.createElement('span');
+                    userSpan.innerHTML = `<div class="user-icon ${iconClass}"></div> ${user}`;
+                    li.appendChild(userSpan);
+                    
+                    // Add player button logic (Admin only, only for actual spectators who aren't the admin himself)
+                    if (gameState.userRole === 'admin' && isSpectator && !isAdmin) {
+                        const addButton = document.createElement('button');
+                        addButton.classList.add('btn', 'primary', 'btn-small');
+                        addButton.textContent = 'Add';
+                        addButton.onclick = () => adminAddPlayer(user);
+                        li.appendChild(addButton);
+                    }
+
                     elements.spectatorList.appendChild(li);
                 });
 
+                // Update Admin Dashboard lists
                 if (gameState.userRole === 'admin') {
-                    elements.adminPlayerList.innerHTML = gameState.players.map(p => `<li>${p} <button class="btn danger btn-small" onclick="adminRemovePlayer('${p}')">Remove</button></li>`).join('');
-                    elements.adminSpectatorList.innerHTML = gameState.spectators.map(s => `<li>${s} <button class="btn primary btn-small" onclick="adminAddPlayer('${s}')">Add</button></li>`).join('');
+                    elements.adminDashboard.style.display = 'block'; 
+                    
+                    // Admin Dashboard Player List 
+                    elements.adminPlayerList.innerHTML = gameState.players.map(p => {
+                        const iconClass = (p === ADMIN_USERNAME) ? 'admin' : 'player';
+                        return `<li><span><div class="user-icon ${iconClass}"></div> ${p}</span> <button class="btn danger btn-small" onclick="adminRemovePlayer('${p}')">Remove</button></li>`;
+                    }).join('');
+                    
+                    // Admin Dashboard Spectator List 
+                    elements.adminSpectatorList.innerHTML = gameState.spectators.map(s => {
+                        const iconClass = (s === ADMIN_USERNAME) ? 'admin' : 'spectator';
+                        return `<li><span><div class="user-icon ${iconClass}"></div> ${s}</span> <button class="btn primary btn-small" onclick="adminAddPlayer('${s}')">Add</button></li>`;
+                    }).join('');
+                } else {
+                    elements.adminDashboard.style.display = 'none';
                 }
             }
+
 
             function renderAdminDashboard() {
                 if (gameState.userRole === 'admin') {
@@ -854,13 +944,14 @@
                 gameState.isGameActive = false;
                 
                 let message = '';
-                let winner = null;
+                let winnerMark = null;
 
                 if (result.winner) {
-                    winner = result.winner;
-                    message = `${winner} wins the game! 🎉`;
-                    gameState.scores[winner]++;
-                    gameState.matchHistory.push({ winner: winner, time: new Date().toLocaleTimeString() });
+                    winnerMark = result.winner;
+                    const winnerName = winnerMark === 'X' ? gameState.players[0] : gameState.players[1];
+                    message = `${winnerName} (${winnerMark}) wins the game! 🎉`;
+                    gameState.scores[winnerMark]++;
+                    gameState.matchHistory.push({ winner: winnerName, time: new Date().toLocaleTimeString() });
                     elements.winSound.currentTime = 0;
                     elements.winSound.play();
                     showNotification(message);
@@ -879,45 +970,40 @@
                 saveState();
                 setTimeout(renderGame, 1500); 
             }
-
+            
+            // ** FIXED FUNCTION: Enhanced Win Line Drawing **
             function drawWinLine(combination) {
                 const [a, b, c] = combination;
-                const cellA = elements.grid.children[a];
-                const cellC = elements.grid.children[c];
+                const grid = elements.grid;
+                const cells = Array.from(grid.children).filter(el => el.classList.contains('cell'));
+
+                if (cells.length !== 9) return; 
+
+                const cellA = cells[a];
+                const cellC = cells[c];
                 
+                // Get center coordinates of the start and end cells relative to the grid container
+                const startX = cellA.offsetLeft + cellA.offsetWidth / 2;
+                const startY = cellA.offsetTop + cellA.offsetHeight / 2;
+                const endX = cellC.offsetLeft + cellC.offsetWidth / 2;
+                const endY = cellC.offsetTop + cellC.offsetHeight / 2;
+
+                // Calculate line properties
+                const length = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+                const angle = Math.atan2(endY - startY, endX - startX) * 180 / Math.PI;
+
                 const line = document.createElement('div');
                 line.classList.add('win-line');
                 
-                const aRect = cellA.getBoundingClientRect();
-                const cRect = cellC.getBoundingClientRect();
-                const gridRect = elements.grid.getBoundingClientRect();
+                // Position the line
+                line.style.width = `${length}px`;
+                line.style.height = '5px'; // Fixed thickness
+                line.style.left = `${startX}px`;
+                line.style.top = `${startY - 2.5}px`; // Adjust for half height
+                line.style.transform = `rotate(${angle}deg)`;
+                line.style.transformOrigin = '0 50%'; // Rotation should start at the 'X' coordinate
 
-                line.style.left = `${aRect.left + aRect.width / 2 - gridRect.left}px`;
-                line.style.top = `${aRect.top + aRect.height / 2 - gridRect.top}px`;
-
-                if (a === 0 && c === 8) { // Diagonal \
-                    line.style.width = '140%';
-                    line.style.height = '5px';
-                    line.style.transform = 'rotate(45deg) translateY(-50%)';
-                    line.style.transformOrigin = '0% 0%';
-                } else if (a === 2 && c === 6) { // Diagonal /
-                    line.style.width = '140%';
-                    line.style.height = '5px';
-                    line.style.transform = 'rotate(-45deg) translateY(-50%)';
-                    line.style.transformOrigin = '100% 0%';
-                } else if (a === 0 && b === 1) { // Horizontal (Top Row)
-                    line.style.width = '100%';
-                    line.style.height = '5px';
-                    line.style.left = '5%'; 
-                    line.style.top = `${aRect.top + aRect.height / 2 - gridRect.top}px`;
-                } else { // Vertical or Middle/Bottom Horizontal (Fallback)
-                    line.style.width = '5px';
-                    line.style.height = '100%';
-                    line.style.top = '5%';
-                    line.style.left = `${aRect.left + aRect.width / 2 - gridRect.left}px`;
-                }
-
-                elements.grid.appendChild(line);
+                grid.appendChild(line);
                 setTimeout(() => line.remove(), 1500);
             }
             
@@ -940,11 +1026,18 @@
                     addChatMessage(`SYSTEM: Admin ${user} has logged in.`, true);
                 } else {
                     gameState.user = user;
-                    gameState.userRole = 'player';
+                    // Treat logged-in non-admin as 'player' role, even if spectating
+                    gameState.userRole = 'player'; 
                     gameState.isLoggedIn = true;
-                    if (!gameState.spectators.includes(user) && !gameState.players.includes(user)) {
-                        gameState.spectators.push(user);
-                        addChatMessage(`SYSTEM: ${user} has joined Prosper's Arena!`, false);
+                    
+                    // Check if user is already an active player or needs to be a spectator
+                    if (!gameState.players.includes(user)) {
+                        if (!gameState.spectators.includes(user)) {
+                            gameState.spectators.push(user);
+                            addChatMessage(`SYSTEM: ${user} has joined Prosper's Arena!`, false);
+                        }
+                    } else {
+                         addChatMessage(`SYSTEM: ${user} has returned to Prosper's Arena!`, false);
                     }
                 }
                 
@@ -959,9 +1052,13 @@
                 gameState.user = guestName;
                 gameState.userRole = 'guest';
                 gameState.isLoggedIn = true;
-                gameState.spectators.push(guestName);
+                
+                if (!gameState.players.includes(guestName) && !gameState.spectators.includes(guestName)) {
+                    gameState.spectators.push(guestName);
+                    addChatMessage(`SYSTEM: ${guestName} has joined as a guest.`, false);
+                }
+                
                 gameState.users[guestName] = { role: 'guest', wins: 0 };
-                addChatMessage(`SYSTEM: ${guestName} has joined as a guest.`, false);
                 saveState();
                 renderApp();
             });
@@ -980,6 +1077,7 @@
                 gameState.userRole = 'guest';
                 gameState.isGameActive = false;
                 
+                // Remove user from all lists
                 gameState.spectators = gameState.spectators.filter(u => u !== user);
                 gameState.players = gameState.players.filter(u => u !== user);
 
@@ -999,12 +1097,19 @@
             });
 
             function handleMove(event) {
-                if (!gameState.isGameActive || (gameState.userRole !== 'player' && gameState.userRole !== 'guest')) return;
-
+                // ** FIXED GUARD CLAUSE: Game must be active **
+                if (!gameState.isGameActive) return;
+                
                 const cellIndex = parseInt(event.currentTarget.dataset.index);
                 
                 const playerX = gameState.players[0];
                 const playerO = gameState.players[1];
+
+                // ** FIXED GUARD CLAUSE: User must be an active player **
+                if (gameState.user !== playerX && gameState.user !== playerO) {
+                    showNotification("You are not an active player in this match.", 'danger');
+                    return;
+                }
                 
                 let isCurrentPlayerTurn = false;
                 if (gameState.currentPlayer === 'X' && gameState.user === playerX) {
@@ -1065,6 +1170,7 @@
                 renderGame();
                 renderAdminDashboard();
                 showNotification('Match has started!', 'primary');
+                saveState();
             }
 
             function adminEndMatch() {
@@ -1073,6 +1179,7 @@
                 renderGame();
                 renderAdminDashboard();
                 showNotification('Match ended!', 'danger');
+                saveState();
             }
 
             // UPDATED SYSTEM RESET
@@ -1109,6 +1216,7 @@
                     addChatMessage(`SYSTEM: Admin added ${spectatorName} as Player ${mark}.`, true);
                     renderSpectators();
                     renderAdminDashboard();
+                    saveState();
                 } else {
                     showNotification('Player list is full (Max 2)!', 'danger');
                 }
@@ -1116,10 +1224,14 @@
 
             function adminRemovePlayer(playerName) {
                 gameState.players = gameState.players.filter(p => p !== playerName);
-                gameState.spectators.push(playerName);
+                // If the user isn't the current user and isn't the admin, add them back to spectators
+                if (playerName !== gameState.user && playerName !== ADMIN_USERNAME) {
+                    gameState.spectators.push(playerName);
+                }
                 addChatMessage(`SYSTEM: Admin removed ${playerName} from players.`, true);
                 renderSpectators();
                 renderAdminDashboard();
+                saveState();
                 if (gameState.isGameActive) adminEndMatch();
             }
             
