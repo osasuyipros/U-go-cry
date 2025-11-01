@@ -666,4 +666,713 @@
                             </div>
                         <div class="chat-input-area">
                             <input type="text" id="chat-input" placeholder="Say something...">
-                            <button id="send-chat-button" class="btn primary icon-btn"><i class="fas fa-paper-plane"></i></
+                            <button id="send-chat-button" class="btn primary icon-btn"><i class="fas fa-paper-plane"></i></button>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+            
+            <div id="notification-area"></div>
+        </div>
+    </div>
+
+    <audio id="move-sound" src="move.mp3" preload="auto"></audio>
+    <audio id="win-sound" src="win.mp3" preload="auto"></audio>
+    <audio id="draw-sound" src="draw.mp3" preload="auto"></audio>
+    
+    <script>
+        /* --- JavaScript Logic (Final) --- */
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- 1. Global State Management (Mock Real-time) ---
+            const ADMIN_USERNAME = 'Prosper';
+            const ADMIN_PASSWORD = 'admin123'; 
+            const LOCAL_STORAGE_KEY = 'PROSPERS_ARENA_GAME_STATE';
+
+            let gameState = {
+                isLoggedIn: false, // Local state
+                user: null, // Local state
+                userRole: 'guest', // Local state
+                
+                // Shared state (Synchronized)
+                board: Array(9).fill(null),
+                currentPlayer: 'X',
+                isGameActive: true,
+                scores: { X: 0, O: 0, draws: 0 },
+                matchHistory: [],
+                users: {}, // { username: { role: 'player'|'spectator'|'admin', symbol: 'X'|'O'|null } }
+                players: [], // Active players in the match, max 2
+                chatMessages: [
+                    { id: 1, user: ADMIN_USERNAME, role: 'admin', text: 'Welcome to Prosper\'s Arena! Please log in.', timestamp: 0 },
+                ],
+                messageIdCounter: 2,
+                theme: 'dark' 
+            };
+            
+            // --- 2. DOM Elements ---
+            const $ = id => document.getElementById(id);
+            const elements = {
+                appContainer: $('app-container'),
+                loadingScreen: $('loading-screen'),
+                loginPage: $('login-page'),
+                mainApp: $('main-app'),
+                usernameInput: $('username-input'),
+                passwordInput: $('password-input'),
+                loginButton: $('login-button'),
+                guestLoginButton: $('guest-login-button'),
+                logoutButton: $('logout-button'),
+                userDisplay: $('user-display'),
+                loginError: $('login-error'),
+                themeToggle: $('theme-toggle'),
+                
+                // Game elements
+                tictactoeGrid: document.querySelector('.tictactoe-grid'),
+                turnIndicator: $('turn-indicator'),
+                playerXScore: $('player-x-score'),
+                playerOScore: $('player-o-score'),
+                drawsCount: $('draws-count'),
+                
+                // Lists & Chat
+                spectatorList: $('spectator-list'),
+                adminDashboard: $('admin-dashboard'),
+                adminPlayerList: $('admin-player-list'),
+                adminSpectatorList: $('admin-spectator-list'),
+                chatMessages: $('chat-messages'),
+                chatInput: $('chat-input'),
+                sendChatButton: $('send-chat-button'),
+                
+                // Admin Stats (mocked)
+                adminTotalUsers: $('admin-total-users'),
+                adminMatchesPlayed: $('admin-matches-played'),
+                adminActiveMatch: $('admin-active-match')
+            };
+            
+            // --- 3. Synchronization (Mock Server) ---
+            
+            function loadSharedState() {
+                try {
+                    const savedState = localStorage.getItem(LOCAL_STORAGE_KEY);
+                    if (savedState) {
+                        const loadedState = JSON.parse(savedState);
+                        // Merge only the shared properties
+                        Object.assign(gameState, loadedState);
+                        // Ensure chat messages are properly initialized if loading an empty state
+                        if (gameState.chatMessages.length === 0) {
+                            gameState.chatMessages = [{ id: 1, user: ADMIN_USERNAME, role: 'admin', text: 'Welcome to Prosper\'s Arena! Please log in.', timestamp: 0 }];
+                            gameState.messageIdCounter = 2;
+                        }
+                    }
+                } catch (e) {
+                    console.error("Could not load game state from localStorage:", e);
+                }
+            }
+
+            function saveSharedState() {
+                try {
+                    // Only save the shared properties
+                    const sharedState = {
+                        board: gameState.board,
+                        currentPlayer: gameState.currentPlayer,
+                        isGameActive: gameState.isGameActive,
+                        scores: gameState.scores,
+                        matchHistory: gameState.matchHistory,
+                        users: gameState.users,
+                        players: gameState.players,
+                        chatMessages: gameState.chatMessages,
+                        messageIdCounter: gameState.messageIdCounter,
+                        theme: gameState.theme 
+                    };
+                    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sharedState));
+                } catch (e) {
+                    console.error("Could not save game state to localStorage:", e);
+                }
+            }
+            
+            // Listen for changes from other tabs/windows
+            window.addEventListener('storage', (event) => {
+                if (event.key === LOCAL_STORAGE_KEY && event.newValue) {
+                    const newSharedState = JSON.parse(event.newValue);
+                    // Merge new state, excluding local user info
+                    const { isLoggedIn, user, userRole } = gameState;
+                    Object.assign(gameState, newSharedState);
+                    
+                    // Restore local user info
+                    gameState.isLoggedIn = isLoggedIn;
+                    gameState.user = user;
+                    gameState.userRole = user ? gameState.users[user]?.role || 'guest' : 'guest';
+                    
+                    // Re-render the UI based on the updated state
+                    if (gameState.isLoggedIn) {
+                        renderBoard();
+                        updateScoreboard();
+                        updateTurnIndicator();
+                        renderUserLists();
+                        renderChat();
+                    }
+                }
+            });
+
+            
+            // --- 4. Utility Functions ---
+            
+            function showNotification(message) {
+                const notification = document.createElement('div');
+                notification.classList.add('notification');
+                notification.textContent = message;
+                $('notification-area').appendChild(notification);
+                
+                setTimeout(() => {
+                    notification.remove();
+                }, 4900); 
+            }
+
+            // --- 5. Core Feature Logic (User Lists, Chat, Admin) ---
+            
+            function adminAssignPlayer(username, symbol) {
+                if (gameState.userRole !== 'admin') {
+                    showNotification("Error: Only the Admin can assign players.");
+                    return;
+                }
+                
+                // 1. Clean up user's current status (Remove from players list)
+                gameState.players = gameState.players.filter(p => p.name !== username);
+                
+                // 2. Promotion or Demotion
+                if (symbol) {
+                    // Promotion: Check if the slot is taken by someone else
+                    if (gameState.players.some(p => p.symbol === symbol)) {
+                        showNotification(`Error: Player slot ${symbol} is already taken.`);
+                        return;
+                    }
+
+                    // Promote: Add the user as a player
+                    gameState.players.push({ name: username, symbol: symbol });
+                    gameState.users[username].role = 'player';
+                    gameState.users[username].symbol = symbol;
+                    
+                    showNotification(`Admin promoted ${username} to Player ${symbol}.`);
+                } else {
+                    // Demotion: Move back to spectator
+                    gameState.users[username].role = 'spectator';
+                    gameState.users[username].symbol = null;
+                    showNotification(`Admin demoted ${username} to Spectator.`);
+                }
+
+                // 3. Save and Re-render
+                saveSharedState();
+                updateScoreboard();
+                renderUserLists();
+                updateTurnIndicator();
+            }
+            
+            function adminKickUser(username) {
+                if (gameState.userRole !== 'admin' || username === gameState.user) {
+                    showNotification("Error: You cannot kick yourself or are not an Admin.");
+                    return;
+                }
+            
+                if (confirm(`Are you sure you want to kick ${username}?`)) {
+                    // Remove from all lists
+                    delete gameState.users[username];
+                    gameState.players = gameState.players.filter(p => p.name !== username);
+
+                    showNotification(`Admin kicked ${username} from the Arena.`);
+                    
+                    // Save and Re-render UI
+                    saveSharedState();
+                    updateScoreboard();
+                    renderUserLists();
+                    renderChat();
+                }
+            }
+            
+            // RENDERING: Update the spectator and admin lists
+            function renderUserLists() {
+                const renderList = (element, users) => {
+                    element.innerHTML = '';
+                    if (users.length === 0) {
+                        element.innerHTML = '<li>No one here yet.</li>';
+                        return;
+                    }
+                    
+                    const availableX = !gameState.players.some(p => p.symbol === 'X');
+                    const availableO = !gameState.players.some(p => p.symbol === 'O');
+
+                    users.forEach(user => {
+                        const userObj = gameState.users[user] || { role: 'spectator', symbol: null };
+                        const listItem = document.createElement('li');
+                        const roleClass = userObj.role;
+                        const isCurrent = user === gameState.user;
+
+                        listItem.innerHTML = `
+                            <span>
+                                <i class="user-icon ${roleClass}"></i> 
+                                ${user} 
+                                ${isCurrent ? '(You)' : ''}
+                                ${roleClass === 'admin' && !isCurrent ? '(Admin)' : ''}
+                                ${userObj.symbol ? `(Playing ${userObj.symbol})` : ''}
+                            </span>
+                            ${gameState.userRole === 'admin' && element.id.startsWith('admin') && !isCurrent ? 
+                                `<div>
+                                    ${roleClass === 'spectator' && availableX ? 
+                                        `<button class="btn btn-small promote-x admin-promote-x-btn" data-user="${user}">Promote X</button>` : ''}
+                                    ${roleClass === 'spectator' && availableO ? 
+                                        `<button class="btn btn-small promote-o admin-promote-o-btn" data-user="${user}">Promote O</button>` : ''}
+                                    ${roleClass === 'player' ? 
+                                        `<button class="btn btn-small secondary admin-demote-btn" data-user="${user}">Demote</button>` : ''}
+                                    <button class="btn btn-small danger admin-kick-btn" data-user="${user}">Kick</button>
+                                </div>` 
+                                : ''}
+                        `;
+                        element.appendChild(listItem);
+                    });
+                };
+                
+                // FIX for Spectator Box: Show all non-players (Spectators and Admins)
+                const allLoggedUsers = Object.keys(gameState.users);
+                const nonPlayersForSpectatorBox = allLoggedUsers
+                    .filter(name => gameState.users[name]?.role !== 'player');
+                
+                renderList(elements.spectatorList, nonPlayersForSpectatorBox);
+                
+                // Admin Dashboard Lists
+                const activePlayerNames = gameState.players.map(p => p.name);
+                
+                const dashboardPlayers = activePlayerNames.length > 0 ? activePlayerNames : ['(Waiting for players)'];
+                
+                // Admin Dashboard: Spectators/Admins
+                let dashboardSpectatorsAdmins = allLoggedUsers
+                    .filter(name => gameState.users[name]?.role !== 'player')
+                    .sort((a, b) => {
+                        // Admins first, then alphabetical
+                        if (gameState.users[a].role === 'admin' && gameState.users[b].role !== 'admin') return -1;
+                        if (gameState.users[a].role !== 'admin' && gameState.users[b].role === 'admin') return 1;
+                        return a.localeCompare(b);
+                    });
+                
+                renderList(elements.adminPlayerList, dashboardPlayers);
+                renderList(elements.adminSpectatorList, dashboardSpectatorsAdmins);
+                
+                // Update Admin Stats (Mock)
+                elements.adminTotalUsers.textContent = allLoggedUsers.length;
+                elements.adminMatchesPlayed.textContent = gameState.scores.X + gameState.scores.O + gameState.scores.draws;
+                elements.adminActiveMatch.textContent = gameState.isGameActive ? 'Yes' : 'No';
+                
+                // Show/Hide Admin Dashboard
+                if (gameState.userRole === 'admin') {
+                    elements.adminDashboard.classList.add('admin-active');
+                } else {
+                    elements.adminDashboard.classList.remove('admin-active');
+                }
+            }
+            
+            function deleteChatMessage(messageId) {
+                if (gameState.userRole !== 'admin') {
+                    showNotification("Error: Only the Admin can delete messages.");
+                    return;
+                }
+                
+                const initialLength = gameState.chatMessages.length;
+                gameState.chatMessages = gameState.chatMessages.filter(msg => msg.id !== messageId);
+                
+                if (initialLength !== gameState.chatMessages.length) {
+                    showNotification(`Admin deleted message ID: ${messageId}`);
+                    saveSharedState();
+                    renderChat(); 
+                }
+            }
+
+            function renderChat() {
+                elements.chatMessages.innerHTML = ''; 
+                
+                gameState.chatMessages.forEach(msg => {
+                    const messageDiv = document.createElement('div');
+                    messageDiv.classList.add('chat-message');
+                    messageDiv.dataset.messageId = msg.id; 
+
+                    if (msg.role === 'admin') {
+                        messageDiv.classList.add('admin-message');
+                    }
+                    
+                    const contentSpan = document.createElement('span');
+                    contentSpan.classList.add('chat-content');
+                    contentSpan.innerHTML = `
+                        <span class="username">${msg.user}:</span>
+                        <span class="text">${msg.text}</span>
+                    `;
+                    messageDiv.appendChild(contentSpan);
+
+                    if (gameState.userRole === 'admin') {
+                        const deleteButton = document.createElement('button');
+                        deleteButton.classList.add('btn', 'danger', 'btn-small', 'delete-chat-btn');
+                        deleteButton.innerHTML = '<i class="fas fa-trash"></i> Delete';
+                        deleteButton.addEventListener('click', () => deleteChatMessage(msg.id));
+                        messageDiv.appendChild(deleteButton);
+                    }
+                    
+                    elements.chatMessages.appendChild(messageDiv);
+                });
+                
+                elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+            }
+            
+            function sendChat() {
+                const text = elements.chatInput.value.trim();
+                if (!text || !gameState.isLoggedIn) return;
+
+                const newMessage = {
+                    id: gameState.messageIdCounter++,
+                    user: gameState.user,
+                    role: gameState.userRole,
+                    text: text,
+                    timestamp: Date.now()
+                };
+                
+                gameState.chatMessages.push(newMessage);
+                saveSharedState();
+                renderChat(); 
+                
+                elements.chatInput.value = '';
+            }
+
+            // --- 6. Game Logic (Tic-Tac-Toe) ---
+            
+            const winningConditions = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8], 
+                [0, 3, 6], [1, 4, 7], [2, 5, 8], 
+                [0, 4, 8], [2, 4, 6]             
+            ];
+            
+            function checkWin() {
+                for (let i = 0; i < winningConditions.length; i++) {
+                    const [a, b, c] = winningConditions[i];
+                    if (gameState.board[a] && gameState.board[a] === gameState.board[b] && gameState.board[a] === gameState.board[c]) {
+                        return { winner: gameState.board[a], condition: [a, b, c] };
+                    }
+                }
+                if (gameState.board.every(cell => cell !== null)) {
+                    return 'Draw';
+                }
+                return null;
+            }
+            
+            function handleResult(result) {
+                gameState.isGameActive = false;
+                const winnerSymbol = result.winner;
+                
+                if (winnerSymbol) {
+                    gameState.scores[winnerSymbol]++;
+                    showNotification(`Player ${winnerSymbol} Wins!`);
+                    elements.turnIndicator.textContent = `Player ${winnerSymbol} WINS!`;
+                    drawWinLine(result.condition);
+                } else if (result === 'Draw') {
+                    gameState.scores.draws++;
+                    showNotification("It's a Draw!");
+                    elements.turnIndicator.textContent = "It's a DRAW!";
+                }
+                
+                saveSharedState();
+                updateScoreboard();
+            }
+
+            function drawWinLine(condition) {
+                const line = document.createElement('div');
+                line.classList.add('win-line');
+                line.style.width = '320px'; 
+                line.style.height = '5px';
+                line.style.top = `${condition[0] * 105 + 50}px`; 
+                line.style.left = '5px';
+                elements.tictactoeGrid.appendChild(line);
+                
+                setTimeout(() => {
+                    line.remove();
+                }, 1500);
+            }
+            
+            function handleCellClick(index) {
+                const isPlayer = gameState.players.some(p => p.name === gameState.user && p.symbol === gameState.currentPlayer);
+                
+                if (!gameState.isGameActive || gameState.board[index] || !isPlayer) {
+                    if (!isPlayer) {
+                         showNotification("You must be an active player to make a move.");
+                    }
+                    return;
+                }
+                
+                gameState.board[index] = gameState.currentPlayer;
+                saveSharedState();
+                renderBoard();
+                
+                const result = checkWin();
+                if (result) {
+                    handleResult(result);
+                    setTimeout(resetGame, 2000);
+                } else {
+                    gameState.currentPlayer = gameState.currentPlayer === 'X' ? 'O' : 'X';
+                    saveSharedState();
+                    updateTurnIndicator();
+                }
+            }
+
+            function resetGame() {
+                gameState.board = Array(9).fill(null);
+                gameState.currentPlayer = 'X';
+                gameState.isGameActive = true;
+                saveSharedState();
+                renderBoard();
+                updateTurnIndicator();
+                elements.tictactoeGrid.querySelector('.win-line')?.remove();
+                showNotification('New Round Started!');
+            }
+            
+            // --- 7. Rendering Functions (No changes needed, already synchronized by storage event) ---
+            
+            function renderBoard() {
+                elements.tictactoeGrid.innerHTML = ''; 
+                gameState.board.forEach((mark, index) => {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.index = index;
+                    cell.addEventListener('click', () => handleCellClick(index));
+
+                    if (mark) {
+                        cell.classList.add(mark.toLowerCase());
+                        cell.innerHTML = `<span>${mark}</span>`;
+                        cell.removeEventListener('click', () => handleCellClick(index));
+                    }
+                    elements.tictactoeGrid.appendChild(cell);
+                });
+            }
+            
+            function updateTurnIndicator() {
+                const activePlayer = gameState.players.find(p => p.symbol === gameState.currentPlayer);
+                
+                if (activePlayer) {
+                    elements.turnIndicator.textContent = `It's ${activePlayer.name}'s turn (${gameState.currentPlayer})`;
+                } else {
+                    elements.turnIndicator.textContent = `Turn: ${gameState.currentPlayer} (Waiting for Player)`;
+                }
+
+                elements.playerXScore.classList.remove('active-turn');
+                elements.playerOScore.classList.remove('active-turn');
+                
+                if (gameState.currentPlayer === 'X') {
+                    elements.playerXScore.classList.add('active-turn');
+                } else {
+                    elements.playerOScore.classList.add('active-turn');
+                }
+            }
+
+            function updateScoreboard() {
+                elements.playerXScore.querySelector('.score-value').textContent = gameState.scores.X;
+                elements.playerOScore.querySelector('.score-value').textContent = gameState.scores.O;
+                elements.drawsCount.textContent = `Draws: ${gameState.scores.draws}`;
+                
+                elements.playerXScore.querySelector('.player-name').textContent = gameState.players.find(p => p.symbol === 'X')?.name || 'Player X';
+                elements.playerOScore.querySelector('.player-name').textContent = gameState.players.find(p => p.symbol === 'O')?.name || 'Player O';
+            }
+            
+            // --- 8. Page Flow and Initialization ---
+
+            function switchPage(pageId) {
+                document.querySelectorAll('.page').forEach(page => {
+                    page.classList.remove('active');
+                });
+                document.getElementById(pageId).classList.add('active');
+            }
+
+            function initializeGame(username, role, symbol = null) { 
+                gameState.user = username;
+                gameState.userRole = role; 
+                gameState.isLoggedIn = true;
+                
+                // Add/Update user in the main user list (SHARED STATE)
+                gameState.users[username] = { role: role, symbol: symbol };
+
+                if (role === 'player' && symbol) {
+                    // Assign player slot
+                    if (!gameState.players.find(p => p.name === username)) {
+                        gameState.players.push({ name: username, symbol: symbol });
+                    }
+                } else if (role === 'spectator' || role === 'admin') {
+                    // Ensure non-players are removed from the player list
+                    gameState.players = gameState.players.filter(p => p.name !== username);
+                }
+                
+                saveSharedState();
+
+                elements.userDisplay.innerHTML = `<i class="fas fa-user-circle"></i> ${gameState.user} <span style="color: ${role === 'admin' ? 'var(--admin-color)' : 'inherit'};">(${gameState.userRole})</span>`;
+                
+                switchPage('main-app');
+                
+                renderBoard();
+                updateScoreboard();
+                updateTurnIndicator();
+                renderUserLists(); 
+                renderChat();
+                showNotification(`Welcome, ${gameState.user}! You are a ${gameState.userRole}.`);
+            }
+
+            function handleLogin() {
+                const username = elements.usernameInput.value.trim();
+                const password = elements.passwordInput.value.trim();
+                
+                if (username.length < 3) {
+                    elements.loginError.textContent = 'Username must be at least 3 characters.';
+                    return;
+                }
+                
+                // Check if user is already logged in elsewhere
+                if (gameState.users[username]) {
+                    elements.loginError.textContent = `User '${username}' is already online. Please use a different name or log out from the other session.`;
+                    return;
+                }
+
+                let role = 'spectator'; 
+                
+                // 1. Check for Admin Login
+                if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+                    role = 'admin';
+                } 
+                // 2. All others are spectators by default (as requested)
+                else {
+                    role = 'spectator';
+                }
+
+                elements.loginError.textContent = '';
+                initializeGame(username, role, null); // Symbol is null, assignment is up to Admin
+            }
+            
+            function handleGuestLogin() {
+                const randomId = Math.floor(Math.random() * 10000);
+                let guestName = 'Guest' + randomId;
+
+                // Ensure unique name
+                while (gameState.users[guestName]) {
+                    guestName = 'Guest' + Math.floor(Math.random() * 10000);
+                }
+                
+                // Guests are always spectators
+                initializeGame(guestName, 'spectator', null);
+            }
+
+            function handleLogout() {
+                const loggedOutUser = gameState.user;
+                
+                // Remove user from the SHARED STATE
+                delete gameState.users[loggedOutUser];
+                gameState.players = gameState.players.filter(p => p.name !== loggedOutUser);
+
+                // Update LOCAL STATE
+                gameState.isLoggedIn = false;
+                gameState.user = null;
+                gameState.userRole = 'guest';
+                
+                // Save and Switch Page
+                saveSharedState();
+                switchPage('login-page');
+                elements.usernameInput.value = '';
+                elements.passwordInput.value = '';
+                elements.loginError.textContent = '';
+                
+                // Crucial: Update lists now that user data is clean
+                renderUserLists(); 
+                updateScoreboard(); // Update player names in scoreboard
+                
+                showNotification(`Goodbye, ${loggedOutUser} has logged out.`);
+            }
+
+            // --- 9. Event Listeners ---
+
+            elements.loginButton.addEventListener('click', handleLogin);
+            elements.guestLoginButton.addEventListener('click', handleGuestLogin);
+            elements.logoutButton.addEventListener('click', handleLogout);
+            
+            elements.chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    sendChat();
+                }
+            });
+            elements.sendChatButton.addEventListener('click', sendChat);
+            
+            // Theme toggle
+            elements.themeToggle.addEventListener('click', () => {
+                gameState.theme = gameState.theme === 'dark' ? 'light' : 'dark';
+                document.body.dataset.theme = gameState.theme;
+                saveSharedState();
+            });
+            
+            // Password toggle
+            $('toggle-password').addEventListener('click', function() {
+                const type = elements.passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                elements.passwordInput.setAttribute('type', type);
+                this.classList.toggle('fa-eye');
+                this.classList.toggle('fa-eye-slash');
+            });
+            
+            // Admin Action Delegation (for new Promote/Demote/Kick buttons)
+            document.addEventListener('click', (e) => {
+                const target = e.target.closest('button');
+                if (!target || gameState.userRole !== 'admin') return;
+
+                const userToActOn = target.dataset.user;
+                if (!userToActOn) return;
+
+                if (target.classList.contains('admin-promote-x-btn')) {
+                    adminAssignPlayer(userToActOn, 'X');
+                } else if (target.classList.contains('admin-promote-o-btn')) {
+                    adminAssignPlayer(userToActOn, 'O');
+                } else if (target.classList.contains('admin-demote-btn')) {
+                    adminAssignPlayer(userToActOn, null); // Demote to spectator
+                } else if (target.classList.contains('admin-kick-btn')) {
+                    adminKickUser(userToActOn);
+                }
+            });
+
+
+            // Mock Admin Actions (Game controls)
+            $('admin-start-match').addEventListener('click', () => {
+                if (gameState.userRole === 'admin') {
+                    gameState.isGameActive = true;
+                    showNotification('Admin started a new match!');
+                    resetGame();
+                }
+            });
+            $('admin-end-match').addEventListener('click', () => {
+                if (gameState.userRole === 'admin') {
+                    gameState.isGameActive = false;
+                    showNotification('Admin ended the current match!');
+                    elements.turnIndicator.textContent = 'Match Ended by Admin';
+                    saveSharedState();
+                }
+            });
+            $('admin-reset-system').addEventListener('click', () => {
+                if (gameState.userRole === 'admin' && confirm('Are you sure you want to reset all scores and history?')) {
+                    // Reset shared state properties
+                    gameState.scores = { X: 0, O: 0, draws: 0 };
+                    gameState.matchHistory = [];
+                    gameState.chatMessages = [{ id: 1, user: ADMIN_USERNAME, role: 'admin', text: 'System reset. Welcome to a fresh match!', timestamp: Date.now() }];
+                    gameState.messageIdCounter = 2;
+                    gameState.board = Array(9).fill(null);
+                    gameState.currentPlayer = 'X';
+                    gameState.isGameActive = true;
+                    
+                    showNotification('Admin performed a full system reset!');
+                    saveSharedState();
+                    updateScoreboard();
+                    renderChat();
+                    renderBoard();
+                }
+            });
+
+            // Initial load
+            loadSharedState();
+            setTimeout(() => {
+                elements.loadingScreen.classList.remove('active');
+                elements.appContainer.style.display = 'block';
+                document.body.dataset.theme = gameState.theme; 
+                renderUserLists();
+            }, 1000); 
+        });
+    </script>
+</body>
+</html>
